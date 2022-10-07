@@ -6,7 +6,7 @@ import kotlin.random.Random
 
 data class Coordinate(val x: Int, val y: Int) {
     companion object {
-        fun of(index: Int) = Coordinate(index % World.MAX_Y, index / World.MAX_Y)
+        fun of(index: Int) = Coordinate(index % World.MAX_X, index / World.MAX_X)
     }
 
     val index: Int = y * World.MAX_X + x
