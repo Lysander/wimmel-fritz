@@ -14,6 +14,15 @@ data class Coordinate(val x: Int, val y: Int) {
     operator fun plus(move: Move) = Coordinate(x + move.x, y + move.y)
 }
 
+/**
+ * ```
+ *  01234567
+ * 1........
+ * 2....x...
+ * 3........
+ * 4........
+ * ```
+ */
 enum class Move(val x: Int, val y: Int) {
     Stay(0, 0),
     Up(0, -1),
@@ -23,8 +32,27 @@ enum class Move(val x: Int, val y: Int) {
     DownRight(1, 1),
     DownLeft(-1, 1),
     Right(1, 0),
-    Left(-1, 0),
+    Left(-1, 0);
+
+    fun reverse(): Move = when (this) {
+        Stay -> Stay
+        Up -> Down
+        Down -> Up
+        Left -> Right
+        Right -> Left
+        else -> Stay
+    }
+
+    fun orthogonal(): List<Move> = when (this) {
+        Up, Down -> listOf(Right, Left)
+        Right, Left -> listOf(Up, Down)
+        else -> listOf(Stay)
+    }
+
 }
+
+val neighbours: List<Move> = Move.values().filterNot { it == Move.Stay }.toList()
+val neighboursFour: List<Move> = listOf(Move.Up, Move.Down, Move.Right, Move.Left)
 
 enum class Tile(
     val symbol: String,
@@ -32,17 +60,18 @@ enum class Tile(
     Empty(""),
     Grass("."),
     StompedGrass("."),
-    Stone("#"),
+    Stone("^"),
     Tree("*"),
     Orc("O"),
-    Troll("T")
+    Troll("T"),
+    Goblin("G")
 }
 
 interface Movement {
-    fun next(world: World, current: Coordinate, last: Move): Move
+    fun next(world: World, current: Coordinate): Coordinate
 }
 
-class Boucing : Movement {
+class Bouncing(private var last: Move) : Movement {
     private val priorities: Map<Move, List<List<Move>>> = mapOf(
         Move.Up to (
                 listOf(
@@ -70,7 +99,7 @@ class Boucing : Movement {
                 )),
     )
 
-    override fun next(world: World, current: Coordinate, last: Move): Move =
+    override fun next(world: World, current: Coordinate): Coordinate =
         priorities[last]!!.random().fold(false to last) { (possible, result), move ->
             if (possible) {
                 true to result
@@ -79,10 +108,12 @@ class Boucing : Movement {
                 else possible to result
             }
         }.let { (possible, move) -> if (possible) move else Move.Stay }
+            .also { last = it }
+            .let { current + it }
 
 }
 
-class KeepOn : Movement {
+class KeepOn(private var last: Move) : Movement {
     private val priorities = mapOf(
         Move.Up to buildList {
             add(listOf(Move.Up, Move.UpLeft, Move.UpRight))
@@ -129,7 +160,7 @@ class KeepOn : Movement {
 
     private fun prioritiesFor(move: Move) = priorities[move]!!.flatMap { it.shuffled() }
 
-    override fun next(world: World, current: Coordinate, last: Move): Move =
+    override fun next(world: World, current: Coordinate): Coordinate =
         prioritiesFor(last).fold(false to last) { (possible, result), move ->
             if (possible) {
                 true to result
@@ -138,15 +169,50 @@ class KeepOn : Movement {
                 else possible to result
             }
         }.let { (possible, move) -> if (possible) move else Move.Stay }
+            .also { last = it }
+            .let { current + it }
 
 }
 
-class SurroundObject : Movement {
+class SurroundObject(private var lastMove: Move, private var lastWallDirection: Move) : Movement {
+    private val initialMovement: Movement = Bouncing(lastMove)
 
-    override fun next(world: World, current: Coordinate, last: Move): Move {
-        TODO("Not yet implemented")
+    private enum class State {
+        Searching,
+        Surrounding
     }
 
+    private var state = State.Searching
+
+    override fun next(world: World, current: Coordinate): Coordinate = if (state == State.Searching) {
+        val nextPosition = initialMovement.next(world, current)
+        if (current + lastMove == nextPosition) nextPosition
+        else {
+            lastWallDirection = lastMove
+            lastMove = lastWallDirection.orthogonal().shuffled().first()
+            state = State.Surrounding
+            nextBySurrounding(world, current)
+        }
+    } else {
+        nextBySurrounding(world, current)
+    }
+
+    private fun nextBySurrounding(world: World, current: Coordinate): Coordinate =
+        if (world.isPassable(current + lastMove) && !world.isPassable(current + lastWallDirection)) {
+            current + lastMove
+        } else if (world.isPassable(current + lastWallDirection)) {
+            lastWallDirection = lastMove.reverse()
+            lastMove = lastWallDirection
+            current + lastWallDirection
+        } else if (!world.isPassable(current + lastMove) && world.isPassable(current + lastWallDirection.reverse())) {
+            lastWallDirection = lastMove
+            lastMove = lastWallDirection.reverse()
+            current + lastWallDirection.reverse()
+        } else {
+            lastMove = lastMove.reverse()
+            lastWallDirection = lastWallDirection.reverse()
+            current + lastMove.reverse()
+        }
 }
 
 data class ActingState(
@@ -163,14 +229,8 @@ data class Entity(
     val tile: Tile,
     val coordinate: Coordinate,
     val state: ActingState,
-    val last: Move,
     val movement: Movement
-) {
-    fun moved(move: Move) = copy(
-        coordinate = coordinate + move,
-        last = move
-    )
-}
+)
 
 data class Field(
     val ground: Tile,
@@ -200,6 +260,7 @@ data class World(
         const val MAX_X: Int = 40
         const val MAX_Y: Int = 25
 
+        const val size: Int = MAX_X * MAX_Y
     }
 
     fun getStartCoordinate(): Coordinate =
@@ -232,7 +293,7 @@ data class World(
 @Lenses
 data class GameState(
     val world: World,
-    val entities: List<Entity>
+    val entities: List<Entity>,
 ) {
     companion object
 }
@@ -240,8 +301,8 @@ data class GameState(
 fun generateWorld(): World {
     val fields = generateSequence {
         when (Random.nextInt(0, 32)) {
-            5, 6, 7 -> Tile.Tree
-            14, 15 -> Tile.Stone
+            5, 6, 7, 8 -> Tile.Tree
+            14 -> Tile.Stone
             else -> Tile.Grass
         }
     }.take(World.MAX_Y * World.MAX_X).map { Field.of(it) }.toList()
@@ -251,7 +312,65 @@ fun generateWorld(): World {
 fun generateGrassWorld(): World =
     World(generateSequence { Tile.Grass }.take(World.MAX_Y * World.MAX_X).map { Field.of(it) }.toList())
 
-//fun generateOrganicWorld(): World = generateGrassWorld().copy(fields = )
+fun neighboursOf(index: Int): List<Int> = with(Coordinate.of(index)) {
+    neighbours
+        .map { this + it }
+        .filter { it.x >= 0 && it.x < World.MAX_X && it.y >= 0 && it.y < World.MAX_Y }
+        .map { it.index }
+}
+
+fun neighboursFourOf(index: Int): List<Int> = with(Coordinate.of(index)) {
+    neighboursFour
+        .map { this + it }
+        .filter { it.x >= 0 && it.x < World.MAX_X && it.y >= 0 && it.y < World.MAX_Y }
+        .map { it.index }
+}
+
+fun blockedNeighboursOf(index: Int, fields: List<Field>): Int =
+    neighboursOf(index).let {
+        (neighbours.size - it.size) + it
+            .map { fields[it] }
+            .filter { it.ground != Tile.Grass }
+            .size
+    }
+
+fun applyCellularAutomata(world: World): World = world.copy(fields = world.fields.mapIndexed { index, _ ->
+    Field.of(if (blockedNeighboursOf(index, world.fields) > 4) Tile.Stone else Tile.Grass)
+})
+
+fun generateInitialWorld(): World {
+    val indexOfStones = (0 until World.size).shuffled().take((World.size * 0.55).toInt()).toHashSet()
+    return generateGrassWorld().let {
+        it.copy(fields = it.fields.withIndex().map { (index, field) ->
+            if (indexOfStones.contains(index)) Field.of(Tile.Stone) else field
+        })
+    }
+}
+
+fun generateCellularWorld(times: Int): World {
+    val initial = generateInitialWorld()
+    return (0 until times).fold(initial) { world, _ ->
+        applyCellularAutomata(world)
+    }
+}
+
+fun erosion(world: World): World {
+    return world.copy(fields = world.fields.withIndex().map { (index, field) ->
+        if(field.ground != Tile.Grass && neighboursOf(index).any { world.fields[it].ground == Tile.Grass }) Field.of(Tile.Grass) else field
+    })
+}
+
+fun dilattation(world: World): World {
+    return world.copy(fields = world.fields.withIndex().map { (index, field) ->
+        if(field.ground == Tile.Grass && neighboursOf(index).any { world.fields[it].ground != Tile.Grass }) Field.of(Tile.Stone) else field
+    })
+}
+
+fun removeGnubbels(world: World): World {
+    return world.copy(fields = world.fields.withIndex().map { (index, field) ->
+        if(field.ground != Tile.Grass && neighboursFourOf(index).filter { world.fields[it].ground == Tile.Grass }.count() > 2) Field.of(Tile.Grass) else field
+    })
+}
 
 // 16 x 16
 fun getDemoWorld() = World(
