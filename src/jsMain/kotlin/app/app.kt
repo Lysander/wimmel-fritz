@@ -1,13 +1,13 @@
 package app
 
 import dev.fritz2.core.*
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import model.*
 
-class GameStore(initial: GameState) : RootStore<GameState>(initial) {
+class GameStore(initial: GameState) : RootStore<GameState>(initial, Job()) {
     val next = handle { old ->
         old.entities.fold(GameState(old.world, emptyList())) { (world, entities), entity ->
             var newEntity = entity.copy(state = entity.state.tick())
@@ -93,14 +93,14 @@ fun main() {
         )
     )
 
-    val storedFields = game.sub(GameState.world() + World.fields())
+    val storedFields = game.map(GameState.world() + World.fields())
 
-    val storedTickspeed = storeOf(100L)
+    val storedTickspeed = storeOf(100L, Job())
     val tick = generateSequence(1) { it + 1 }.asFlow()
 
     render {
         div("w-full h-screen flex items-center justify-center") {
-            div("w-3/5 h-screen p-4 m-4 flex flex-row gap-2") {
+            div("w-screen h-screen p-4 m-4 flex flex-row gap-2") {
                 div("grid grid-cols-2 gap-2") {
                     div("flex flex-col gap-2") {
                         button("p-2 bg-gray-300") {
@@ -174,7 +174,7 @@ fun main() {
                     }
                 }
                 // TODO: Grid von World-Breite ableiten!
-                div("w-full grid grid-cols-[repeat(40,_minmax(0,_1fr))] justify-items-center text-xl") {
+                div("w-full h-96 grid grid-cols-[repeat(80,_minmax(0,_1fr))] justify-items-center text-xl") {
                     storedFields.data.renderEach(into = this) { field ->
                         val color = when (field.ground) {
                             Tile.Grass -> if (field.base == Tile.Empty) "bg-green-300" else "bg-yellow-100"
@@ -202,6 +202,8 @@ fun main() {
                     delay(speed)
                     //console.log(index)
                 } handledBy game.next
+
+                //Window.keydownsIf { shortcutOf(this) == shortcutOf("m") } handledBy game.next
             }
         }
     }

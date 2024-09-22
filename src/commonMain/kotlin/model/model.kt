@@ -201,17 +201,19 @@ class SurroundObject(private var lastMove: Move, private var lastWallDirection: 
         if (world.isPassable(current + lastMove) && !world.isPassable(current + lastWallDirection)) {
             current + lastMove
         } else if (world.isPassable(current + lastWallDirection)) {
-            lastWallDirection = lastMove.reverse()
+            val tmpLastMove = lastMove
             lastMove = lastWallDirection
-            current + lastWallDirection
+            lastWallDirection = tmpLastMove.reverse()
+            current + lastMove
         } else if (!world.isPassable(current + lastMove) && world.isPassable(current + lastWallDirection.reverse())) {
+            val tmpLastWallDir = lastWallDirection
             lastWallDirection = lastMove
-            lastMove = lastWallDirection.reverse()
-            current + lastWallDirection.reverse()
+            lastMove = tmpLastWallDir.reverse()
+            current + tmpLastWallDir.reverse()
         } else {
             lastMove = lastMove.reverse()
             lastWallDirection = lastWallDirection.reverse()
-            current + lastMove.reverse()
+            current + lastMove
         }
 }
 
@@ -257,7 +259,7 @@ data class World(
     val fields: List<Field>
 ) {
     companion object {
-        const val MAX_X: Int = 40
+        const val MAX_X: Int = 80
         const val MAX_Y: Int = 25
 
         const val size: Int = MAX_X * MAX_Y

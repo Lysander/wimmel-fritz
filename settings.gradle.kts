@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "wimmel-fritz"
+rootProject.name = "fritz2-tailwind-template"
