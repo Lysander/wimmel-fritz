@@ -176,6 +176,7 @@ class KeepOn(private var last: Move) : Movement {
 
 class SurroundObject(private var lastMove: Move, private var lastWallDirection: Move) : Movement {
     private val initialMovement: Movement = Bouncing(lastMove)
+    private var lastMovements: List<Move> = emptyList()
 
     private enum class State {
         Searching,
@@ -184,34 +185,51 @@ class SurroundObject(private var lastMove: Move, private var lastWallDirection: 
 
     private var state = State.Searching
 
-    override fun next(world: World, current: Coordinate): Coordinate = if (state == State.Searching) {
-        val nextPosition = initialMovement.next(world, current)
-        if (current + lastMove == nextPosition) nextPosition
-        else {
-            lastWallDirection = lastMove
-            lastMove = lastWallDirection.orthogonal().shuffled().first()
-            state = State.Surrounding
+    private fun surroundEmptySpace() = lastMovements.toHashSet().size == 4
+
+    private fun pushMove(move: Move) {
+        lastMovements = if(lastMovements.size == 4) lastMovements.drop(1) + move else lastMovements + move
+    }
+
+    override fun next(world: World, current: Coordinate): Coordinate {
+        if(state == State.Surrounding && surroundEmptySpace()) {
+            println("Gehe zurück auf Suchmodus")
+            state = State.Searching
+            lastMovements = emptyList()
+        }
+        return if (state == State.Searching) {
+            val nextPosition = initialMovement.next(world, current)
+            if (current + lastMove == nextPosition) nextPosition
+            else {
+                lastWallDirection = lastMove
+                lastMove = lastWallDirection.orthogonal().shuffled().first()
+                state = State.Surrounding
+                nextBySurrounding(world, current)
+            }
+        } else {
             nextBySurrounding(world, current)
         }
-    } else {
-        nextBySurrounding(world, current)
     }
 
     private fun nextBySurrounding(world: World, current: Coordinate): Coordinate =
         if (world.isPassable(current + lastMove) && !world.isPassable(current + lastWallDirection)) {
+            pushMove(lastMove)
             current + lastMove
         } else if (world.isPassable(current + lastWallDirection)) {
             val tmpLastMove = lastMove
             lastMove = lastWallDirection
+            pushMove(lastMove)
             lastWallDirection = tmpLastMove.reverse()
             current + lastMove
         } else if (!world.isPassable(current + lastMove) && world.isPassable(current + lastWallDirection.reverse())) {
             val tmpLastWallDir = lastWallDirection
             lastWallDirection = lastMove
             lastMove = tmpLastWallDir.reverse()
+            pushMove(lastMove)
             current + tmpLastWallDir.reverse()
         } else {
             lastMove = lastMove.reverse()
+            pushMove(lastMove)
             lastWallDirection = lastWallDirection.reverse()
             current + lastMove
         }
