@@ -2,9 +2,7 @@ package app
 
 import dev.fritz2.core.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
 import model.*
 
 class GameStore(initial: GameState) : RootStore<GameState>(initial, Job()) {
@@ -97,6 +95,7 @@ fun main() {
 
     val storedTickspeed = storeOf(100L, Job())
     val tick = generateSequence(1) { it + 1 }.asFlow()
+    val storedTickType = storeOf(true, Job())
 
     render {
         div("w-full h-screen flex items-center justify-center") {
@@ -171,6 +170,12 @@ fun main() {
                         button("p-2 bg-gray-300") {
                             +"Remove Gnubbels"
                         }.clicks.map { } handledBy game.applyRemoveGnubbels
+
+                        button("p-2 bg-gray-300") {
+                            storedTickType.data.map { 
+                                if(it) "Move Automatic" else "Move by 'M'" 
+                            }.renderText(into = this)
+                        }.clicks.map { !storedTickType.current } handledBy storedTickType.update
                     }
                 }
                 // TODO: Grid von World-Breite ableiten!
@@ -208,12 +213,20 @@ fun main() {
                     }
                 }
 
-                tick.combine(storedTickspeed.data, ::Pair).map { (index, speed) ->
-                    delay(speed)
-                    //console.log(index)
+                combine(
+                    tick,
+                    storedTickspeed.data,
+                    storedTickType.data,
+                    ::Triple
+                ).mapNotNull { (index, speed, typ) ->
+                    if(typ) delay(speed) else null
                 } handledBy game.next
 
-                //Window.keydownsIf { shortcutOf(this) == shortcutOf("m") } handledBy game.next
+                combine(
+                    Window.keydownsIf { shortcutOf(this) == shortcutOf("m") },
+                    storedTickType.data,
+                    ::Pair
+                ).map { } handledBy game.next
             }
         }
     }
