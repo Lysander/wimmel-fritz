@@ -177,8 +177,18 @@ fun main() {
                 div("w-full h-96 grid grid-cols-[repeat(80,_minmax(0,_1fr))] justify-items-center text-xl") {
                     storedFields.data.renderEach(into = this) { field ->
                         val color = when (field.ground) {
-                            Tile.Grass -> if (field.base == Tile.Empty) "bg-green-300" else "bg-yellow-100"
-                            Tile.StompedGrass -> if (field.base == Tile.Empty) "bg-green-200" else "bg-yellow-100"
+                            Tile.Grass -> when (field.base) { 
+                                 Tile.Orc -> "bg-yellow-100" 
+                                 Tile.Troll -> "bg-cyan-300" 
+                                 Tile.Goblin -> "bg-red-300" 
+                                 else -> "bg-green-300"
+                            }
+                            Tile.StompedGrass ->  when (field.base) { 
+                                 Tile.Orc -> "bg-yellow-100" 
+                                 Tile.Troll -> "bg-cyan-300" 
+                                 Tile.Goblin -> "bg-red-300" 
+                                 else -> "bg-green-200"
+                            }
                             Tile.Tree -> "bg-green-600"
                             Tile.Stone -> "bg-gray-500"
                             else -> ""
