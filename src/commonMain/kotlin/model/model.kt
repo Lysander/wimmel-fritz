@@ -58,7 +58,7 @@ enum class Tile(
     val symbol: String,
 ) {
     Empty(""),
-    Grass("."),
+    Grass(";"),
     StompedGrass("."),
     Stone("^"),
     Tree("*"),
