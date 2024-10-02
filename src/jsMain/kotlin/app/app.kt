@@ -53,6 +53,18 @@ class GameStore(initial: GameState) : RootStore<GameState>(initial, Job()) {
         )
     }
 
+    val spawnMimic = handle<Int> { state, ticks ->
+        state.copy(
+            entities = state.entities + Entity(
+                "M${state.entities.size}",
+                Tile.Mimic,
+                state.world.getStartCoordinate(),
+                ActingState(ticks),
+                SwitchingMovement(KeepOn(Move.Stay))
+            )
+        )
+    }
+
     val cycleTerrain = handle<Int> { state, index ->
         //state.copy(world = state.world.fields.mapIndexed { i, field -> if(index) })
         state
@@ -136,6 +148,16 @@ fun main() {
                             }.clicks.map { ticks } handledBy game.spawnGoblin
                         }
 
+                        listOf(
+                            "Fast" to 1,
+                            "Normal" to 2,
+                            "Slow" to 4
+                        ).forEach { (text, ticks) ->
+                            button("p-2 bg-gray-300") {
+                                +"$text Mimic"
+                            }.clicks.map { ticks } handledBy game.spawnMimic
+                        }
+
                         input(id = "Tickspeed") {
                             type("range")
                             name("Tickspeed")
@@ -186,12 +208,14 @@ fun main() {
                                  Tile.Orc -> "bg-yellow-100" 
                                  Tile.Troll -> "bg-cyan-300" 
                                  Tile.Goblin -> "bg-red-300" 
+                                 Tile.Mimic -> "bg-purple-300" 
                                  else -> "bg-green-300"
                             }
                             Tile.StompedGrass ->  when (field.base) { 
                                  Tile.Orc -> "bg-yellow-100" 
                                  Tile.Troll -> "bg-cyan-300" 
                                  Tile.Goblin -> "bg-red-300" 
+                                 Tile.Mimic -> "bg-purple-300" 
                                  else -> "bg-green-200"
                             }
                             Tile.Tree -> "bg-green-600"

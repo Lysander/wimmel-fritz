@@ -64,7 +64,8 @@ enum class Tile(
     Tree("*"),
     Orc("O"),
     Troll("T"),
-    Goblin("G")
+    Goblin("G"),
+    Mimic("M"),
 }
 
 interface Movement {
@@ -233,6 +234,24 @@ class SurroundObject(private var lastMove: Move, private var lastWallDirection: 
             lastWallDirection = lastWallDirection.reverse()
             current + lastMove
         }
+}
+
+class SwitchingMovement(private var movement: Movement) : Movement {
+    private var countedMoves = 0
+    private val movements = listOf(
+        Bouncing(Move.Up),
+        KeepOn(Move.Right),
+        SurroundObject(Move.Left, Move.Right)
+    )
+    
+    override fun next(world: World, current: Coordinate): Coordinate {
+        countedMoves += 1
+        if(countedMoves > 100) {
+            countedMoves = 0
+            movement = movements.shuffled().first()
+        }
+        return movement.next(world, current)
+    }
 }
 
 data class ActingState(
