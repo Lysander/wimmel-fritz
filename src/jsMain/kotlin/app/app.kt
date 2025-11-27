@@ -93,6 +93,24 @@ class GameStore(initial: GameState) : RootStore<GameState>(initial, Job()) {
     val applyRemoveGnubbels = handle {
         it.copy(world = removeGnubbels(it.world))
     }
+
+    val applyFillGaps = handle {
+        it.copy(world = fillGaps(it.world))
+    }
+
+    val generateNiceMap = handle {
+        val first = it.copy(world = generateInitialWorld())
+        val afterFirst = (1..10).fold(first) { akku, _ ->
+            akku.copy(world = removeGnubbels(akku.world))
+        }
+        val second = afterFirst.copy(world = applyCellularAutomata(afterFirst.world))
+        val afterSecond = (1..10).fold(second) { akku, _ ->
+            akku.copy(world = removeGnubbels(akku.world))
+        }
+        val expand = afterSecond.copy(world = dilattation(afterSecond.world))
+        val last = afterSecond.copy(world = applyCellularAutomata(expand.world))
+        afterSecond.copy(world = fillGaps(last.world))
+    }
 }
 
 fun main() {
@@ -194,8 +212,16 @@ fun main() {
                         }.clicks.map { } handledBy game.applyRemoveGnubbels
 
                         button("p-2 bg-gray-300") {
-                            storedTickType.data.map { 
-                                if(it) "Move Automatic" else "Move by 'M'" 
+                            +"Fill Gaps"
+                        }.clicks.map { } handledBy game.applyFillGaps
+
+                        button("p-2 bg-gray-300") {
+                            +"Generate Nice Map"
+                        }.clicks.map { } handledBy game.generateNiceMap
+
+                        button("p-2 bg-gray-300") {
+                            storedTickType.data.map {
+                                if (it) "Move Automatic" else "Move by 'M'"
                             }.renderText(into = this)
                         }.clicks.map { !storedTickType.current } handledBy storedTickType.update
                     }
@@ -204,20 +230,22 @@ fun main() {
                 div("w-full h-96 grid grid-cols-[repeat(80,_minmax(0,_1fr))] justify-items-center text-xl") {
                     storedFields.data.renderEach(into = this) { field ->
                         val color = when (field.ground) {
-                            Tile.Grass -> when (field.base) { 
-                                 Tile.Orc -> "bg-yellow-100" 
-                                 Tile.Troll -> "bg-cyan-300" 
-                                 Tile.Goblin -> "bg-red-300" 
-                                 Tile.Mimic -> "bg-purple-300" 
-                                 else -> "bg-green-300"
+                            Tile.Grass -> when (field.base) {
+                                Tile.Orc -> "bg-yellow-100"
+                                Tile.Troll -> "bg-cyan-300"
+                                Tile.Goblin -> "bg-red-300"
+                                Tile.Mimic -> "bg-purple-300"
+                                else -> "bg-green-300"
                             }
-                            Tile.StompedGrass ->  when (field.base) { 
-                                 Tile.Orc -> "bg-yellow-100" 
-                                 Tile.Troll -> "bg-cyan-300" 
-                                 Tile.Goblin -> "bg-red-300" 
-                                 Tile.Mimic -> "bg-purple-300" 
-                                 else -> "bg-green-200"
+
+                            Tile.StompedGrass -> when (field.base) {
+                                Tile.Orc -> "bg-yellow-100"
+                                Tile.Troll -> "bg-cyan-300"
+                                Tile.Goblin -> "bg-red-300"
+                                Tile.Mimic -> "bg-purple-300"
+                                else -> "bg-green-200"
                             }
+
                             Tile.Tree -> "bg-green-600"
                             Tile.Stone -> "bg-gray-500"
                             else -> ""
@@ -243,7 +271,7 @@ fun main() {
                     storedTickType.data,
                     ::Triple
                 ).mapNotNull { (index, speed, typ) ->
-                    if(typ) delay(speed) else null
+                    if (typ) delay(speed) else null
                 } handledBy game.next
 
                 combine(

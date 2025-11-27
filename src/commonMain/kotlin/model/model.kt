@@ -14,6 +14,10 @@ data class Coordinate(val x: Int, val y: Int) {
     operator fun plus(move: Move) = Coordinate(x + move.x, y + move.y)
 }
 
+enum class Direction {
+    None, Horizontal, Vertical
+}
+
 /**
  * ```
  *  01234567
@@ -49,9 +53,15 @@ enum class Move(val x: Int, val y: Int) {
         else -> listOf(Stay)
     }
 
+    fun toDirection(): Direction = when(this) {
+        Up, Down -> Direction.Vertical
+        Left, Right -> Direction.Horizontal
+        else -> Direction.None
+    }
+
 }
 
-val neighbours: List<Move> = Move.values().filterNot { it == Move.Stay }.toList()
+val neighbours: List<Move> = Move.entries.filterNot { it == Move.Stay }.toList()
 val neighboursFour: List<Move> = listOf(Move.Up, Move.Down, Move.Right, Move.Left)
 
 enum class Tile(
@@ -156,7 +166,7 @@ class KeepOn(private var last: Move) : Movement {
             add(listOf(Move.UpRight, Move.DownLeft))
             add(listOf(Move.Up, Move.UpLeft, Move.Left))
         },
-        Move.Stay to listOf(Move.values().filter { it != Move.Stay })
+        Move.Stay to listOf(Move.entries.filter { it != Move.Stay })
     )
 
     private fun prioritiesFor(move: Move) = priorities[move]!!.flatMap { it.shuffled() }
@@ -186,7 +196,12 @@ class SurroundObject(private var lastMove: Move, private var lastWallDirection: 
 
     private var state = State.Searching
 
-    private fun surroundEmptySpace() = lastMovements.toHashSet().size == 4
+    private val circlePatterns = setOf(
+        listOf(Direction.Vertical, Direction.Horizontal, Direction.Vertical, Direction.Horizontal),
+        listOf(Direction.Horizontal, Direction.Vertical, Direction.Horizontal, Direction.Vertical)
+    )
+
+    private fun surroundEmptySpace() = lastMovements.toHashSet().size == 4 && lastMovements.map { it.toDirection() } in circlePatterns
 
     private fun pushMove(move: Move) {
         lastMovements = if(lastMovements.size == 4) lastMovements.drop(1) + move else lastMovements + move
@@ -407,7 +422,13 @@ fun dilattation(world: World): World {
 
 fun removeGnubbels(world: World): World {
     return world.copy(fields = world.fields.withIndex().map { (index, field) ->
-        if(field.ground != Tile.Grass && neighboursFourOf(index).filter { world.fields[it].ground == Tile.Grass }.count() > 2) Field.of(Tile.Grass) else field
+        if(field.ground != Tile.Grass && neighboursFourOf(index).count { world.fields[it].ground == Tile.Grass } > 2) Field.of(Tile.Grass) else field
+    })
+}
+
+fun fillGaps(world: World): World {
+    return world.copy(fields = world.fields.withIndex().map { (index, field) ->
+        if(field.ground == Tile.Grass && neighboursFourOf(index).count { world.fields[it].ground != Tile.Grass } == 3) Field.of(Tile.Stone) else field
     })
 }
 
