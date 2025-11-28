@@ -311,8 +311,8 @@ data class World(
     val fields: List<Field>
 ) {
     companion object {
-        const val MAX_X: Int = 80
-        const val MAX_Y: Int = 25
+        const val MAX_X: Int = 120
+        const val MAX_Y: Int = 45
 
         const val size: Int = MAX_X * MAX_Y
     }

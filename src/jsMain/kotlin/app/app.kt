@@ -227,7 +227,7 @@ fun main() {
                     }
                 }
                 // TODO: Grid von World-Breite ableiten!
-                div("w-full h-96 grid grid-cols-[repeat(80,_minmax(0,_1fr))] justify-items-center text-xl") {
+                div("w-full h-96 grid grid-cols-[repeat(120,_minmax(0,_1fr))] justify-items-center text-xl") {
                     storedFields.data.renderEach(into = this) { field ->
                         val color = when (field.ground) {
                             Tile.Grass -> when (field.base) {
@@ -250,7 +250,7 @@ fun main() {
                             Tile.Stone -> "bg-gray-500"
                             else -> ""
                         }
-                        div("w-full flex justify-center $color") {
+                        div("aspect-square w-full flex justify-center $color") {
                             if (field.base == Tile.Empty) {
                                 +field.ground.symbol
                             } else {
